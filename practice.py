@@ -7,7 +7,7 @@ import logging
 import pandas as pd
 from sklearn.linear_model.logistic import LogisticRegression
 from sklearn.grid_search import GridSearchCV
-# from sklearn.pipeline import Pipeline
+from sklearn.pipeline import Pipeline
 import sys
 reload(sys)
 sys.setdefaultencoding('utf8')
@@ -179,12 +179,16 @@ if __name__ == '__main__':
     y_test = y_train[840000:]
 
     # 未使用手机品牌字段 counts = data['手机品牌'].value_counts()
-    lr = ('clf', LogisticRegression())
+    pipeline = Pipeline([('clf', LogisticRegression())])
     params = {
-        'clf_penalty': ('l1', 'l2'),
-        'clf_c': (0.01, 0.1, 1, 10)
+        'clf__penalty': ('l1', 'l2'),
+        'clf__C': (0.01, 0.1, 1, 10)
     }
-    grid_search = GridSearchCV(lr, params, verbose=1, scoring='roc_auc', cv=3)
+    grid_search = GridSearchCV(pipeline,
+                               params,
+                               verbose=1,
+                               scoring='roc_auc',
+                               cv=3)
     grid_search.fit(X_train[0:840000], y_train['是否去过迪士尼'][0:840000])
     logger.info('最佳效果' + str(grid_search.best_score_))
 
