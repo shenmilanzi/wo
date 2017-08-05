@@ -3,13 +3,25 @@
 
 # import numpy as np
 import csv
+import logging
 import pandas as pd
 from sklearn.linear_model.logistic import LogisticRegression
-# from sklearn.grid_search import GridSearchCV
+from sklearn.grid_search import GridSearchCV
 # from sklearn.pipeline import Pipeline
 import sys
 reload(sys)
 sys.setdefaultencoding('utf8')
+
+logger = logging.getLogger('aucLog')
+logger.setLevel(logging.INFO)
+
+logfile = logging.FileHandler('auc.log')
+logfile.setLevel(logging.INFO)
+
+formatter = logging.Formatter('等价于sklearn.metrics.roc_auc_score')
+logfile.setFormatter(formatter)
+
+logger.addHandler(logfile)
 
 
 def get_field(raw_data):
@@ -133,7 +145,7 @@ def get_result(predict_result):
 
 
 def compute_auc(predict_file, real_results):
-    '''计算AUC评分
+    '''计算AUC评分, 等价于 sklearn.metrics.roc_auc_score
     Params:
         predict_file: 预测结果文件
         real_results: 真实结果
@@ -162,23 +174,30 @@ def compute_auc(predict_file, real_results):
 
 if __name__ == '__main__':
     data = pd.read_csv('/data/第1题：算法题数据/数据集1_用户标签_本地_训练集.csv')
-    train_data_label = pd.read_csv('/data/第1题：算法题数据/用户是否去过迪士尼_训练集.csv')
-    train_data = get_field(data)
-    real_results = train_data_label[840000:]
+    y_train = pd.read_csv('/data/第1题：算法题数据/用户是否去过迪士尼_训练集.csv')
+    X_train = get_field(data)
+    y_test = y_train[840000:]
 
     # 未使用手机品牌字段 counts = data['手机品牌'].value_counts()
-    classifier = LogisticRegression()
-    classifier.fit(train_data[0:840000], train_data_label['是否去过迪士尼'][0:840000])
-    results = classifier.predict_proba(train_data[840000:])
+    lr = ('clf', LogisticRegression())
+    params = {
+        'clf_penalty': ('l1', 'l2'),
+        'clf_c': (0.01, 0.1, 1, 10)
+    }
+    grid_search = GridSearchCV(lr, params, verbose=1, scoring='roc_auc', cv=3)
+    grid_search.fit(X_train[0:840000], y_train['是否去过迪士尼'][0:840000])
+    logger.info('最佳效果' + str(grid_search.best_score_))
+
+    results = grid_search.predict_proba(X_train[840000:])
     predict_results = map(get_result, results)
 
     # 预测结果写入文件
     with open('result.csv', 'wb') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(['IMEI', 'SCORE'])
-        for idx in range(len(train_data[840000:])):
+        for idx in range(len(X_train[840000:])):
             writer.writerow(
                 [(data['用户标识'][840000:])[840000 + idx],
                  '%.6f' % predict_results[idx]])
     # 计算AUC评分
-    print compute_auc('result.csv', real_results)
+    logger.info(str(compute_auc('result.csv', y_test)))
