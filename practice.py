@@ -6,8 +6,9 @@ import csv
 import logging
 import pandas as pd
 from sklearn.linear_model.logistic import LogisticRegression
-from sklearn.grid_search import GridSearchCV
-from sklearn.pipeline import Pipeline
+# from sklearn.grid_search import GridSearchCV
+from sklearn.metrics import roc_auc_score
+# from sklearn.pipeline import Pipeline
 import sys
 reload(sys)
 sys.setdefaultencoding('utf8')
@@ -18,7 +19,8 @@ logger.setLevel(logging.INFO)
 logfile = logging.FileHandler('auc.log')
 logfile.setLevel(logging.INFO)
 
-formatter = logging.Formatter('等价于sklearn.metrics.roc_auc_score')
+formatter = logging.Formatter(
+    '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logfile.setFormatter(formatter)
 
 logger.addHandler(logfile)
@@ -30,6 +32,7 @@ def get_field(raw_data):
         '年龄段': raw_data['年龄段'],
         '大致消费水平': raw_data['大致消费水平'],
         '每月的大致刷卡消费次数': raw_data['每月的大致刷卡消费次数'],
+        '手机品牌': raw_data['手机品牌'],
         '爱奇艺': raw_data['爱奇艺'],
         '腾讯视频': raw_data['腾讯视频'],
         '唱吧': raw_data['唱吧'],
@@ -141,7 +144,7 @@ def get_result(predict_result):
         predict_results: 原始预测结果
     Returns: 精确到小数点后四位的结果
     '''
-    return round(predict_result[1], 6)
+    return round(predict_result[1], 7)
 
 
 def compute_auc(predict_file, real_results):
@@ -178,22 +181,26 @@ if __name__ == '__main__':
     X_train = get_field(data)
     y_test = y_train[840000:]
 
-    # 未使用手机品牌字段 counts = data['手机品牌'].value_counts()
-    pipeline = Pipeline([('clf', LogisticRegression())])
-    params = {
-        'clf__penalty': ('l1', 'l2'),
-        'clf__C': (0.01, 0.1, 1, 10)
-    }
-    grid_search = GridSearchCV(pipeline,
-                               params,
-                               verbose=1,
-                               scoring='roc_auc',
-                               cv=3)
-    grid_search.fit(X_train[0:840000], y_train['是否去过迪士尼'][0:840000])
-    logger.info('最佳效果' + str(grid_search.best_score_))
+    # 使用手机品牌字段 counts = data['手机品牌'].value_counts()
+    # 将手机品牌字段用对应训练数据的概率代替
+    brand = data['手机品牌']
+    counts = brand.value_counts()
+    proba = map(lambda x: float(counts[x]) / brand.count(), counts.keys())
+    # freq 存储每个手机品牌的概率, dict
+    freq = {key: proba[idx] for idx, key in enumerate(counts.keys())}
 
-    results = grid_search.predict_proba(X_train[840000:])
+    # 用手机品牌概率替换手机品牌，方便分析
+    X_train['手机品牌'] = pd.DataFrame(
+        map(lambda x: freq.get(x, 0), X_train['手机品牌']))
+    logger.info('-----proba replace finished-----')
+
+    classifier = LogisticRegression()
+    classifier.fit(X_train[0:840000], y_train[0:840000]['是否去过迪士尼'])
+    logger.info('-----model finished-----')
+
+    results = classifier.predict_proba(X_train[840000:])
     predict_results = map(get_result, results)
+    logger.info('-----predict finished-----')
 
     # 预测结果写入文件
     with open('result.csv', 'wb') as csvfile:
@@ -204,4 +211,5 @@ if __name__ == '__main__':
                 [(data['用户标识'][840000:])[840000 + idx],
                  '%.6f' % predict_results[idx]])
     # 计算AUC评分
-    logger.info(str(compute_auc('result.csv', y_test)))
+    # logger.info(str(compute_auc('result.csv', y_test)))
+    logger.info(str(roc_auc_score(y_test['是否去过迪士尼'], predict_results)))
