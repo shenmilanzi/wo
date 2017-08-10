@@ -195,14 +195,14 @@ def compute_auc(predict_file, real_results):
 
 if __name__ == '__main__':
     train_data = pd.read_csv('/data/第1题：算法题数据/数据集1_用户标签_本地_训练集.csv')
-    y_train = pd.read_csv('/data/第1题：算法题数据/用户是否去过迪士尼_训练集.csv')
-    # test_data = pd.read_csv('/data/第1题：算法题数据/数据集1_用户标签_本地_测试集.csv')
+    y_train = pd.read_csv('/data/第1题：算法题数据/数据集2_用户是否去过迪士尼_训练集.csv')
+    test_data = pd.read_csv('/data/第1题：算法题数据/数据集1_用户标签_本地_测试集.csv')
 
-    X_train = get_field(train_data)
+    X_train, X_test = map(get_field, [train_data, test_data])
     y_train = y_train['是否去过迪士尼']
 
     # 使用手机品牌字段 counts = data['手机品牌'].value_counts()
-    X_train = rep_brand(X_train)
+    X_train, X_test = map(rep_brand, [X_train, X_test])
     logger.info('-----proba replace finished-----')
 
     lgb_train = lgb.Dataset(X_train[0:840000], y_train[0:840000])
@@ -222,18 +222,17 @@ if __name__ == '__main__':
     gbm.save_model('model.txt')
 
     # predict
-    y_pred = gbm.predict(X_train[840000:], num_iteration=gbm.best_iteration)
+    y_pred = gbm.predict(X_test, num_iteration=gbm.best_iteration)
     logger.info('-----predict finished-----')
 
     # 预测结果写入文件
-    '''
     with open('result.csv', 'wb') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(['IMEI', 'SCORE'])
         for idx in range(len(X_test)):
             writer.writerow(
-                [train_data[840000:]['用户标识'][idx], '%.6f' % y_pred[idx]])
-    '''
+                [test_data['用户标识'][idx], '%.6f' % y_pred[idx]])
+
     # 计算AUC评分
     # logger.info(str(compute_auc('result.csv', y_test)))
-    logger.info(str(roc_auc_score(y_train[840000:], y_pred)))
+    # logger.info(str(roc_auc_score(y_train[840000:], y_pred)))
