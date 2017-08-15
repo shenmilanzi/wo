@@ -31,6 +31,7 @@ def get_field(raw_data):
         '大致消费水平': raw_data['大致消费水平'],
         '每月的大致刷卡消费次数': raw_data['每月的大致刷卡消费次数'],
         '手机品牌': raw_data['手机品牌'],
+        '用户更换手机频次': raw_data['用户更换手机频次'],
         '视频': raw_data['视频'],
         '音乐': raw_data['音乐'],
         '图片': raw_data['图片'],
@@ -170,16 +171,19 @@ if __name__ == '__main__':
         category = f.readlines()
 
     category = map(get_category, category)
+
+    # 分别统计train和test中300APP分类情况
     for cat in category:
         train[cat[0]] = reduce(pd.Series.add, map(lambda x: train[x], cat[1:]))
         test[cat[0]] = reduce(pd.Series.add, map(lambda x: train[x], cat[1:]))
 
-    X_train, X_test = map(get_field, [train, test])
+    # 生成所需的训练集和测试集
+    train, test = map(get_field, [train, test])
     label = label['是否去过迪士尼']
     ID = test['用户标识']
 
     # 使用手机品牌字段 counts = data['手机品牌'].value_counts()
-    X_train, X_test = map(rep_brand, [X_train, X_test])
+    train, test = map(rep_brand, [train, test])
     logger.info('-----proba replace finished-----')
 
     lgb_train = lgb.Dataset(train, label)
