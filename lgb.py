@@ -171,6 +171,7 @@ if __name__ == '__main__':
         category = f.readlines()
 
     category = map(get_category, category)
+    ID = test['用户标识']
 
     # 分别统计train和test中300APP分类情况
     for cat in category:
@@ -180,7 +181,6 @@ if __name__ == '__main__':
     # 生成所需的训练集和测试集
     train, test = map(get_field, [train, test])
     label = label['是否去过迪士尼']
-    ID = test['用户标识']
 
     # 使用手机品牌字段 counts = data['手机品牌'].value_counts()
     train, test = map(rep_brand, [train, test])
@@ -212,7 +212,7 @@ if __name__ == '__main__':
     logger.info('-----model finished-----')
 
     # predict
-    y_pred = lgb.predict(test)
+    y_pred = estimator.predict(test)
     logger.info('-----predict finished-----')
 
     # 预测结果写入文件
